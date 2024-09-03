@@ -1,7 +1,10 @@
 import time
-class MonteCarloTreeSearch(object):
 
-    def __init__(self, node):
+from mctspy.tree.policy import AbstractPolicy
+
+
+class MonteCarloTreeSearch:
+    def __init__(self, node, primary_policy: AbstractPolicy, rollout_policy: AbstractPolicy):
         """
         MonteCarloTreeSearchNode
         Parameters
@@ -9,6 +12,8 @@ class MonteCarloTreeSearch(object):
         node : mctspy.tree.nodes.MonteCarloTreeSearchNode
         """
         self.root = node
+        self.primary_policy = primary_policy
+        self.rollout_policy = rollout_policy
 
     def best_action(self, simulations_number=None, total_simulation_seconds=None):
         """
@@ -31,14 +36,14 @@ class MonteCarloTreeSearch(object):
             end_time = time.time() + total_simulation_seconds
             while True:
                 v = self._tree_policy()
-                reward = v.rollout()
+                reward = v.rollout(self.rollout_policy)
                 v.backpropagate(reward)
                 if time.time() > end_time:
                     break
         else :
             for _ in range(0, simulations_number):            
                 v = self._tree_policy()
-                reward = v.rollout()
+                reward = v.rollout(self.rollout_policy)
                 v.backpropagate(reward)
         # to select best child go for exploitation only
         return self.root.best_child(c_param=0.)
@@ -56,5 +61,5 @@ class MonteCarloTreeSearch(object):
             if not current_node.is_fully_expanded():
                 return current_node.expand()
             else:
-                current_node = current_node.best_child()
+                current_node = current_node.best_child(primary_policy=self.primary_policy)
         return current_node

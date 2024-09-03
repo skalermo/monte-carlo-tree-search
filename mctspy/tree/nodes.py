@@ -1,6 +1,10 @@
+from typing import Optional
+
 import numpy as np
 from collections import defaultdict
 from abc import ABC, abstractmethod
+
+from mctspy.tree.policy import AbstractPolicy
 
 
 class MonteCarloTreeSearchNode(ABC):
@@ -47,7 +51,7 @@ class MonteCarloTreeSearchNode(ABC):
         pass
 
     @abstractmethod
-    def rollout(self):
+    def rollout(self, rollout_policy: Optional[AbstractPolicy]):
         pass
 
     @abstractmethod
@@ -57,10 +61,14 @@ class MonteCarloTreeSearchNode(ABC):
     def is_fully_expanded(self):
         return len(self.untried_actions) == 0
 
-    def best_child(self, c_param=1.4):
+    def best_child(self, c_param: float = 1.4, primary_policy: Optional[AbstractPolicy] = None):
+        if primary_policy is not None:
+            action_probas = primary_policy.get_action_proba_dist(self.state, self.state.get_legal_actions())
+        else:
+            action_probas = [1, 1, 1, 1]
         choices_weights = [
-            (c.q / c.n) + c_param * np.sqrt((2 * np.log(self.n) / c.n))
-            for c in self.children
+            (c.q / c.n) + c_param * a * np.sqrt((2 * np.log(self.n) / c.n))
+            for c, a in zip(self.children, action_probas)
         ]
         return self.children[np.argmax(choices_weights)]
 
@@ -104,11 +112,13 @@ class TwoPlayersGameMonteCarloTreeSearchNode(MonteCarloTreeSearchNode):
     def is_terminal_node(self):
         return self.state.is_game_over()
 
-    def rollout(self):
+    def rollout(self, custom_rollout_policy: AbstractPolicy):
         current_rollout_state = self.state
         while not current_rollout_state.is_game_over():
             possible_moves = current_rollout_state.get_legal_actions()
-            action = self.rollout_policy(possible_moves)
+            action_proba_dist = custom_rollout_policy.get_action_proba_dist(current_rollout_state, possible_moves)
+            action = np.random.choice([0, 1, 2, 3], p=action_proba_dist)
+            # action = self.rollout_policy(possible_moves)
             current_rollout_state = current_rollout_state.move(action)
         return current_rollout_state.game_result
 
